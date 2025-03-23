@@ -2,21 +2,23 @@ import { fetchSSE } from '../fetch-sse'
 import { GenerateAnswerParams, Provider } from '../types'
 
 export class OpenAIProvider implements Provider {
-  constructor(private token: string, private model: string) {
+  constructor(private token: string, private model: string, private apiBaseUrl?: string) {
     this.token = token
     this.model = model
+    this.apiBaseUrl = apiBaseUrl || 'https://api.openai.com'
   }
 
-  private buildPrompt(prompt: string): string {
-    if (this.model.startsWith('text-chat-davinci')) {
-      return `Respond conversationally.<|im_end|>\n\nUser: ${prompt}<|im_sep|>\nChatGPT:`
-    }
-    return prompt
+  private buildMessages(prompt: string): Array<{ role: string; content: string }> {
+    return [
+      { role: 'developer', content: 'You are a helpful assistant.' },
+      { role: 'user', content: prompt },
+    ]
   }
 
   async generateAnswer(params: GenerateAnswerParams) {
     let result = ''
-    await fetchSSE('https://api.openai.com/v1/completions', {
+    let messageId = ''
+    await fetchSSE(`${this.apiBaseUrl}/v1/chat/completions`, {
       method: 'POST',
       signal: params.signal,
       headers: {
@@ -25,9 +27,8 @@ export class OpenAIProvider implements Provider {
       },
       body: JSON.stringify({
         model: this.model,
-        prompt: this.buildPrompt(params.prompt),
+        messages: this.buildMessages(params.prompt),
         stream: true,
-        max_tokens: 2048,
       }),
       onMessage(message) {
         console.debug('sse message', message)
@@ -38,19 +39,31 @@ export class OpenAIProvider implements Provider {
         let data
         try {
           data = JSON.parse(message)
-          const text = data.choices[0].text
-          if (text === '<|im_end|>' || text === '<|im_sep|>') {
-            return
+          if (!messageId && data.id) {
+            messageId = data.id
           }
-          result += text
-          params.onEvent({
-            type: 'answer',
-            data: {
-              text: result,
-              messageId: data.id,
-              conversationId: data.id,
-            },
-          })
+
+          if (data.choices && data.choices.length > 0) {
+            const { delta, finish_reason } = data.choices[0]
+
+            if (finish_reason === 'stop') {
+              params.onEvent({ type: 'done' })
+              return
+            }
+
+            const content = delta?.content || ''
+            if (content) {
+              result += content
+              params.onEvent({
+                type: 'answer',
+                data: {
+                  text: result,
+                  messageId: messageId,
+                  conversationId: messageId,
+                },
+              })
+            }
+          }
         } catch (err) {
           console.error(err)
           return

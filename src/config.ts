@@ -63,6 +63,7 @@ export enum ProviderType {
 interface GPT3ProviderConfig {
   model: string
   apiKey: string
+  apiBaseUrl?: string
 }
 
 export interface ProviderConfigs {

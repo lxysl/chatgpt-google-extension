@@ -8,15 +8,24 @@ async function generateAnswers(port: Browser.Runtime.Port, question: string) {
   const providerConfigs = await getProviderConfigs()
 
   let provider: Provider
+  let currentModel = 'ChatGPT'
+
   if (providerConfigs.provider === ProviderType.ChatGPT) {
     const token = await getChatGPTAccessToken()
     provider = new ChatGPTProvider(token)
   } else if (providerConfigs.provider === ProviderType.GPT3) {
-    const { apiKey, model } = providerConfigs.configs[ProviderType.GPT3]!
-    provider = new OpenAIProvider(apiKey, model)
+    const { apiKey, model, apiBaseUrl } = providerConfigs.configs[ProviderType.GPT3]!
+    currentModel = model
+    provider = new OpenAIProvider(apiKey, model, apiBaseUrl)
   } else {
     throw new Error(`Unknown provider ${providerConfigs.provider}`)
   }
+
+  // 发送当前 provider 和模型信息
+  port.postMessage({
+    provider: providerConfigs.provider,
+    model: currentModel,
+  })
 
   const controller = new AbortController()
   port.onDisconnect.addListener(() => {

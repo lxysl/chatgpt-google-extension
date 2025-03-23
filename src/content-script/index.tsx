@@ -10,6 +10,9 @@ import { getPossibleElementByQuerySelector } from './utils'
 async function mount(question: string, siteConfig: SearchEngine) {
   const container = document.createElement('div')
   container.className = 'chat-gpt-container'
+  container.style.width = '100%'
+  container.style.minWidth = '300px'
+  container.style.display = 'block'
 
   const userConfig = await getUserConfig()
   let theme: Theme

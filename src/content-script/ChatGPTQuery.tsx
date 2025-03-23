@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import Browser from 'webextension-polyfill'
 import { captureEvent } from '../analytics'
+import { ProviderType } from '../config'
 import { Answer } from '../messaging'
 import ChatGPTFeedback from './ChatGPTFeedback'
 import { isBraveBrowser, shouldShowRatingTip } from './utils.js'
@@ -23,6 +24,8 @@ function ChatGPTQuery(props: Props) {
   const [done, setDone] = useState(false)
   const [showTip, setShowTip] = useState(false)
   const [status, setStatus] = useState<QueryStatus>()
+  const [provider, setProvider] = useState<ProviderType>()
+  const [model, setModel] = useState<string>('ChatGPT')
 
   useEffect(() => {
     props.onStatusChange?.(status)
@@ -39,6 +42,9 @@ function ChatGPTQuery(props: Props) {
         setStatus('error')
       } else if (msg.event === 'DONE') {
         setDone(true)
+      } else if (msg.provider !== undefined && msg.model !== undefined) {
+        setProvider(msg.provider)
+        setModel(msg.model)
       }
     }
     port.onMessage.addListener(listener)
@@ -149,7 +155,12 @@ function ChatGPTQuery(props: Props) {
     )
   }
 
-  return <p className="text-[#b6b8ba] animate-pulse">Waiting for ChatGPT response...</p>
+  const waitingMessage =
+    provider === ProviderType.GPT3
+      ? `Waiting for ${model} response...`
+      : 'Waiting for ChatGPT response...'
+
+  return <p className="text-[#b6b8ba] animate-pulse">{waitingMessage}</p>
 }
 
 export default memo(ChatGPTQuery)
